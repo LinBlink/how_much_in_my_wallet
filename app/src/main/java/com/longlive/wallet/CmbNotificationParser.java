@@ -6,7 +6,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class CmbNotificationParser {
-  private static final Pattern ACCOUNT = Pattern.compile("您账户(\\d{4})");
+  // CMB uses both “您账户9653” and “您尾号9653” in real notifications.
+  private static final Pattern ACCOUNT =
+      Pattern.compile("(?:您(?:账户|尾号)|尾号)(\\d{4})");
   private static final Pattern AMOUNT = Pattern.compile("人民币([0-9,]+\\.\\d{2})");
   private static final String[] INCOME = {"收款", "入账", "存入", "退款"};
   private static final String[] EXPENSE = {"扣款", "消费", "支出", "转出", "取款"};

@@ -16,6 +16,14 @@ public class CmbNotificationParserTest {
     assertEquals(1, result.deltaCents);
   }
 
+  @Test public void parsesCardTailIncomeNotification() {
+    CmbNotificationParser.Result result = CmbNotificationParser.parse(
+        "您尾号9653的招行一卡通入账人民币101.48元");
+    assertNotNull(result);
+    assertEquals("9653", result.accountLast4);
+    assertEquals(10148, result.deltaCents);
+  }
+
   @Test public void parsesRealExpenseNotification() {
     CmbNotificationParser.Result result = CmbNotificationParser.parse(
         "您账户9653于08月30日13:05在【财付通-微信支付-微信零钱充值账户】" +
