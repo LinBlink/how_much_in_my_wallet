@@ -20,7 +20,6 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
   private static final int SMS_PERMISSION_REQUEST = 41;
-  private static final int CALENDAR_PERMISSION_REQUEST = 42;
 
   private TextView status;
   private TextView result;
@@ -37,7 +36,6 @@ public class MainActivity extends Activity {
     ensureSmsPermission();
     CmbEventStore.resendRecent(this);
     IcbcBalanceStore.resend(this);
-    sendNextCalendarEvent();
   }
 
   @Override protected void onStart() {
@@ -90,10 +88,6 @@ public class MainActivity extends Activity {
     notificationPermission.setOnClickListener(v -> startActivity(
         new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
     box.addView(notificationPermission);
-
-    Button calendarPermission = button("授权读取下一条日程");
-    calendarPermission.setOnClickListener(v -> ensureCalendarPermission());
-    box.addView(calendarPermission);
 
     Button importLatest = button("读取最近南京银行短信");
     importLatest.setOnClickListener(v -> importLatestBankSms(true));
@@ -173,54 +167,22 @@ public class MainActivity extends Activity {
     if (bank != null) PebbleBalanceSender.send(this, bank);
     CmbEventStore.resendRecent(this);
     IcbcBalanceStore.resend(this);
-    sendNextCalendarEvent();
     toast("已重新发送保存的数据");
-  }
-
-  private void ensureCalendarPermission() {
-    if (android.os.Build.VERSION.SDK_INT < 23 || hasCalendarPermission()) {
-      sendNextCalendarEvent();
-      refresh();
-      return;
-    }
-    requestPermissions(new String[]{Manifest.permission.READ_CALENDAR},
-        CALENDAR_PERMISSION_REQUEST);
-  }
-
-  private boolean hasCalendarPermission() {
-    return checkSelfPermission(Manifest.permission.READ_CALENDAR) ==
-        PackageManager.PERMISSION_GRANTED;
-  }
-
-  private void sendNextCalendarEvent() {
-    PebbleBalanceSender.sendNextEvent(this, NextCalendarEvent.load(this));
   }
 
   private void refresh() {
     boolean smsGranted = android.os.Build.VERSION.SDK_INT < 23 || hasSmsPermissions();
-    boolean calendarGranted = android.os.Build.VERSION.SDK_INT < 23 || hasCalendarPermission();
     status.setText("短信权限：" + (smsGranted ? "已授予" : "未完整授予") +
-        "\n银行 App 通知权限：" + (hasNotificationAccess() ? "已开启" : "未开启") +
-        "\n日历权限：" + (calendarGranted ? "已授予" : "未授予"));
+        "\n银行 App 通知权限：" + (hasNotificationAccess() ? "已开启" : "未开启"));
     NanjingBankSms bank = NanjingBankSms.load(this);
     String nj = bank == null ? "南京银行：暂无有效余额短信" : bank.displayText();
     result.setText(nj + "\n\n" + CmbEventStore.lastText(this) +
-        "\n\n" + IcbcBalanceStore.displayText(this) +
-        "\n\n" + NextCalendarEvent.displayText(this));
+        "\n\n" + IcbcBalanceStore.displayText(this));
   }
 
   @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
                                                     int[] grantResults) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-    if (requestCode == CALENDAR_PERMISSION_REQUEST) {
-      if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-        sendNextCalendarEvent();
-      } else {
-        toast("需要日历权限才能同步下一条日程");
-      }
-      refresh();
-      return;
-    }
     if (requestCode != SMS_PERMISSION_REQUEST) return;
     boolean granted = grantResults.length >= 2;
     for (int grant : grantResults) granted &= grant == PackageManager.PERMISSION_GRANTED;

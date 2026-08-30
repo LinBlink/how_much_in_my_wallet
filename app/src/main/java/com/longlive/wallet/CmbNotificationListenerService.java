@@ -19,7 +19,6 @@ public final class CmbNotificationListenerService extends NotificationListenerSe
       for (StatusBarNotification notification : active) onNotificationPosted(notification);
     }
     IcbcBalanceStore.resend(this);
-    PebbleBalanceSender.sendNextEvent(this, NextCalendarEvent.load(this));
   }
 
   @Override public void onNotificationPosted(StatusBarNotification sbn) {
