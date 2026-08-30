@@ -1,7 +1,0 @@
-<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewTextChanged"
-    android:accessibilityFeedbackType="feedbackGeneric"
-    android:notificationTimeout="300"
-    android:canRetrieveWindowContent="true"
-    android:description="读取当前已打开的微信或支付宝余额文本"
-    android:settingsActivity="com.longlive.wallet.MainActivity" />
