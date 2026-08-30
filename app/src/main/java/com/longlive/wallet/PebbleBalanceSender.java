@@ -13,6 +13,9 @@ final class PebbleBalanceSender {
   private static final int BANK_CARD_LAST4 = 10024;
   private static final int BANK_BALANCE_CENTS = 10025;
   private static final int BANK_UPDATED_AT = 10026;
+  private static final int CMB_BALANCE_DELTA_CENTS = 10028;
+  private static final int CMB_EVENT_ID = 10029;
+  private static final int CMB_EVENT_AT = 10030;
 
   private PebbleBalanceSender() {}
 
@@ -22,6 +25,14 @@ final class PebbleBalanceSender {
     data.addString(BANK_CARD_LAST4, balance.last4);
     data.addInt32(BANK_BALANCE_CENTS, balance.balanceCents);
     data.addInt32(BANK_UPDATED_AT, balance.updatedAt);
+    PebbleKit.sendDataToPebble(context.getApplicationContext(), WATCHFACE_UUID, data);
+  }
+
+  static void sendCmbDelta(Context context, CmbEventStore.Event event) {
+    PebbleDictionary data = new PebbleDictionary();
+    data.addInt32(CMB_BALANCE_DELTA_CENTS, event.deltaCents);
+    data.addInt32(CMB_EVENT_ID, event.id);
+    data.addInt32(CMB_EVENT_AT, event.occurredAt);
     PebbleKit.sendDataToPebble(context.getApplicationContext(), WATCHFACE_UUID, data);
   }
 }

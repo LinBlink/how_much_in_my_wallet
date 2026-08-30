@@ -3,6 +3,7 @@ package com.longlive.wallet;
 import android.Manifest;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -13,6 +14,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,11 +34,13 @@ public class MainActivity extends Activity {
     super.onCreate(state);
     buildUi();
     ensureSmsPermission();
+    CmbEventStore.resendRecent(this);
   }
 
   @Override protected void onStart() {
     super.onStart();
     IntentFilter filter = new IntentFilter(NanjingBankSms.ACTION_UPDATED);
+    filter.addAction(CmbEventStore.ACTION_UPDATED);
     if (android.os.Build.VERSION.SDK_INT >= 33) {
       registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED);
     } else {
@@ -44,6 +48,11 @@ public class MainActivity extends Activity {
     }
     receiverRegistered = true;
     refresh();
+  }
+
+  @Override protected void onResume() {
+    super.onResume();
+    if (status != null) refresh();
   }
 
   @Override protected void onStop() {
@@ -58,27 +67,32 @@ public class MainActivity extends Activity {
     box.setPadding(40, 48, 40, 40);
 
     TextView title = new TextView(this);
-    title.setText("南京银行余额");
+    title.setText("银行卡余额同步");
     title.setTextSize(28);
     title.setTextColor(Color.DKGRAY);
     box.addView(title);
 
     TextView hint = new TextView(this);
-    hint.setText("仅处理号码 106980095302 发来的南京银行余额短信。短信只在本机解析，不上传。新短信会自动同步到 Pebble 表盘。");
+    hint.setText("南京银行从 106980095302 短信读取绝对余额；招商银行从 App 收入/扣款通知计算余额。数据仅在本机处理并同步到 Pebble。");
     hint.setTextSize(16);
     hint.setPadding(0, 24, 0, 24);
     box.addView(hint);
 
-    Button permission = button("授予短信权限");
-    permission.setOnClickListener(v -> ensureSmsPermission());
-    box.addView(permission);
+    Button smsPermission = button("授予短信权限");
+    smsPermission.setOnClickListener(v -> ensureSmsPermission());
+    box.addView(smsPermission);
 
-    Button importLatest = button("读取最近短信并发送到手表");
+    Button notificationPermission = button("开启招商银行通知读取权限");
+    notificationPermission.setOnClickListener(v -> startActivity(
+        new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+    box.addView(notificationPermission);
+
+    Button importLatest = button("读取最近南京银行短信");
     importLatest.setOnClickListener(v -> importLatestBankSms(true));
     box.addView(importLatest);
 
-    Button resend = button("重新发送已保存余额");
-    resend.setOnClickListener(v -> resendSavedBalance());
+    Button resend = button("重新发送所有已保存数据");
+    resend.setOnClickListener(v -> resendSavedData());
     box.addView(resend);
 
     Button appSettings = button("打开系统应用设置");
@@ -93,10 +107,13 @@ public class MainActivity extends Activity {
     box.addView(status);
 
     result = new TextView(this);
-    result.setTextSize(22);
+    result.setTextSize(19);
     result.setTextColor(Color.DKGRAY);
     box.addView(result);
-    setContentView(box);
+
+    ScrollView scroll = new ScrollView(this);
+    scroll.addView(box);
+    setContentView(scroll);
   }
 
   private Button button(String text) {
@@ -119,6 +136,18 @@ public class MainActivity extends Activity {
         checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED;
   }
 
+  private boolean hasNotificationAccess() {
+    String enabled = Settings.Secure.getString(
+        getContentResolver(), "enabled_notification_listeners");
+    if (enabled == null || enabled.isEmpty()) return false;
+    ComponentName wanted = new ComponentName(this, CmbNotificationListenerService.class);
+    for (String item : enabled.split(":")) {
+      ComponentName component = ComponentName.unflattenFromString(item);
+      if (wanted.equals(component)) return true;
+    }
+    return false;
+  }
+
   private void importLatestBankSms(boolean showMessage) {
     if (android.os.Build.VERSION.SDK_INT >= 23 && !hasSmsPermissions()) {
       ensureSmsPermission();
@@ -126,26 +155,25 @@ public class MainActivity extends Activity {
     }
     NanjingBankSms bank = BankSmsImporter.importLatest(this);
     if (showMessage) {
-      toast(bank == null ? "未找到符合格式的南京银行短信" : "已发送余额到手表");
+      toast(bank == null ? "未找到符合格式的南京银行短信" : "已发送南京银行余额");
     }
     refresh();
   }
 
-  private void resendSavedBalance() {
+  private void resendSavedData() {
     NanjingBankSms bank = NanjingBankSms.load(this);
-    if (bank == null) {
-      toast("暂无已保存余额");
-      return;
-    }
-    PebbleBalanceSender.send(this, bank);
-    toast("已重新发送到手表");
+    if (bank != null) PebbleBalanceSender.send(this, bank);
+    CmbEventStore.resendRecent(this);
+    toast("已重新发送保存的数据");
   }
 
   private void refresh() {
-    boolean granted = android.os.Build.VERSION.SDK_INT < 23 || hasSmsPermissions();
-    status.setText(granted ? "短信权限：已授予" : "短信权限：未完整授予");
+    boolean smsGranted = android.os.Build.VERSION.SDK_INT < 23 || hasSmsPermissions();
+    status.setText("短信权限：" + (smsGranted ? "已授予" : "未完整授予") +
+        "\n招商银行通知权限：" + (hasNotificationAccess() ? "已开启" : "未开启"));
     NanjingBankSms bank = NanjingBankSms.load(this);
-    result.setText(bank == null ? "暂无有效余额短信" : bank.displayText());
+    String nj = bank == null ? "南京银行：暂无有效余额短信" : bank.displayText();
+    result.setText(nj + "\n\n" + CmbEventStore.lastText(this));
   }
 
   @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
