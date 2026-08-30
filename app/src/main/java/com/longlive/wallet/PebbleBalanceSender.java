@@ -16,6 +16,8 @@ final class PebbleBalanceSender {
   private static final int CMB_BALANCE_DELTA_CENTS = 10028;
   private static final int CMB_EVENT_ID = 10029;
   private static final int CMB_EVENT_AT = 10030;
+  private static final int ICBC_BALANCE_CENTS = 10031;
+  private static final int ICBC_UPDATED_AT = 10032;
 
   private PebbleBalanceSender() {}
 
@@ -33,6 +35,13 @@ final class PebbleBalanceSender {
     data.addInt32(CMB_BALANCE_DELTA_CENTS, event.deltaCents);
     data.addInt32(CMB_EVENT_ID, event.id);
     data.addInt32(CMB_EVENT_AT, event.occurredAt);
+    PebbleKit.sendDataToPebble(context.getApplicationContext(), WATCHFACE_UUID, data);
+  }
+
+  static void sendIcbcBalance(Context context, IcbcBalanceStore.Balance balance) {
+    PebbleDictionary data = new PebbleDictionary();
+    data.addInt32(ICBC_BALANCE_CENTS, balance.balanceCents);
+    data.addInt32(ICBC_UPDATED_AT, balance.updatedAt);
     PebbleKit.sendDataToPebble(context.getApplicationContext(), WATCHFACE_UUID, data);
   }
 }

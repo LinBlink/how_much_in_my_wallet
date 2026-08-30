@@ -9,23 +9,32 @@ import android.text.TextUtils;
 
 public final class CmbNotificationListenerService extends NotificationListenerService {
   private static final String CMB_PACKAGE = "cmb.pb";
+  private static final String ICBC_PACKAGE = "com.icbc";
   private static final String FLYME_PUSH_PACKAGE = "com.meizu.cloud";
 
   @Override public void onListenerConnected() {
     super.onListenerConnected();
     StatusBarNotification[] active = getActiveNotifications();
-    if (active == null) return;
-    for (StatusBarNotification notification : active) onNotificationPosted(notification);
+    if (active != null) {
+      for (StatusBarNotification notification : active) onNotificationPosted(notification);
+    }
+    IcbcBalanceStore.resend(this);
   }
 
   @Override public void onNotificationPosted(StatusBarNotification sbn) {
     Notification notification = sbn.getNotification();
     Bundle extras = notification.extras;
-    if (extras == null || !isCmbNotification(sbn.getPackageName(), extras)) return;
+    if (extras == null) return;
 
     CharSequence big = extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
     CharSequence normal = extras.getCharSequence(Notification.EXTRA_TEXT);
     String text = String.valueOf(!TextUtils.isEmpty(big) ? big : normal);
+    if (isIcbcNotification(sbn.getPackageName(), extras)) {
+      handleIcbc(text, (int) Math.min(sbn.getPostTime() / 1000, Integer.MAX_VALUE));
+      return;
+    }
+    if (!isCmbNotification(sbn.getPackageName(), extras)) return;
+
     CmbNotificationParser.Result parsed = CmbNotificationParser.parse(text);
     if (parsed == null) return;
 
@@ -43,6 +52,22 @@ public final class CmbNotificationListenerService extends NotificationListenerSe
 
     PebbleBalanceSender.sendCmbDelta(this, event);
     sendBroadcast(new Intent(CmbEventStore.ACTION_UPDATED).setPackage(getPackageName()));
+  }
+
+  private void handleIcbc(String text, int occurredAt) {
+    IcbcNotificationParser.Result parsed = IcbcNotificationParser.parse(text);
+    if (parsed == null || occurredAt <= 0) return;
+    IcbcBalanceStore.Balance balance = new IcbcBalanceStore.Balance(
+        parsed.accountLast4, parsed.balanceCents, occurredAt, text);
+    if (!IcbcBalanceStore.saveIfNewer(this, balance)) return;
+    PebbleBalanceSender.sendIcbcBalance(this, balance);
+    sendBroadcast(new Intent(IcbcBalanceStore.ACTION_UPDATED).setPackage(getPackageName()));
+  }
+
+  private static boolean isIcbcNotification(String packageName, Bundle extras) {
+    if (!ICBC_PACKAGE.equals(packageName)) return false;
+    String title = String.valueOf(extras.getCharSequence(Notification.EXTRA_TITLE, ""));
+    return title.contains("动账通知");
   }
 
   private static boolean isCmbNotification(String packageName, Bundle extras) {

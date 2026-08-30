@@ -35,12 +35,14 @@ public class MainActivity extends Activity {
     buildUi();
     ensureSmsPermission();
     CmbEventStore.resendRecent(this);
+    IcbcBalanceStore.resend(this);
   }
 
   @Override protected void onStart() {
     super.onStart();
     IntentFilter filter = new IntentFilter(NanjingBankSms.ACTION_UPDATED);
     filter.addAction(CmbEventStore.ACTION_UPDATED);
+    filter.addAction(IcbcBalanceStore.ACTION_UPDATED);
     if (android.os.Build.VERSION.SDK_INT >= 33) {
       registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED);
     } else {
@@ -73,7 +75,7 @@ public class MainActivity extends Activity {
     box.addView(title);
 
     TextView hint = new TextView(this);
-    hint.setText("南京银行从 106980095302 短信读取绝对余额；招商银行从 App 收入/扣款通知计算余额。数据仅在本机处理并同步到 Pebble。");
+    hint.setText("南京银行从短信读取绝对余额；招商银行从 App 变动通知计算余额；工商银行从 App 动账通知直接读取余额。数据仅在本机处理并同步到 Pebble。");
     hint.setTextSize(16);
     hint.setPadding(0, 24, 0, 24);
     box.addView(hint);
@@ -82,7 +84,7 @@ public class MainActivity extends Activity {
     smsPermission.setOnClickListener(v -> ensureSmsPermission());
     box.addView(smsPermission);
 
-    Button notificationPermission = button("开启招商银行通知读取权限");
+    Button notificationPermission = button("开启银行 App 通知读取权限");
     notificationPermission.setOnClickListener(v -> startActivity(
         new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
     box.addView(notificationPermission);
@@ -164,16 +166,18 @@ public class MainActivity extends Activity {
     NanjingBankSms bank = NanjingBankSms.load(this);
     if (bank != null) PebbleBalanceSender.send(this, bank);
     CmbEventStore.resendRecent(this);
+    IcbcBalanceStore.resend(this);
     toast("已重新发送保存的数据");
   }
 
   private void refresh() {
     boolean smsGranted = android.os.Build.VERSION.SDK_INT < 23 || hasSmsPermissions();
     status.setText("短信权限：" + (smsGranted ? "已授予" : "未完整授予") +
-        "\n招商银行通知权限：" + (hasNotificationAccess() ? "已开启" : "未开启"));
+        "\n银行 App 通知权限：" + (hasNotificationAccess() ? "已开启" : "未开启"));
     NanjingBankSms bank = NanjingBankSms.load(this);
     String nj = bank == null ? "南京银行：暂无有效余额短信" : bank.displayText();
-    result.setText(nj + "\n\n" + CmbEventStore.lastText(this));
+    result.setText(nj + "\n\n" + CmbEventStore.lastText(this) +
+        "\n\n" + IcbcBalanceStore.displayText(this));
   }
 
   @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,

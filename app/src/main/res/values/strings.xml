@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">银行卡余额同步</string>
-    <string name="cmb_notification_listener">招商银行余额通知同步</string>
+    <string name="cmb_notification_listener">银行余额通知同步</string>
 </resources>
